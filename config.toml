@@ -1,0 +1,7 @@
+devname = "WH-1000XM2 (AVRCP)"
+
+[commands]
+PlayCD = "playerctl play || playmusic -q &"
+PauseCD = "playerctl pause"
+NextSong = "playerctl next"
+PreviousSong = "playerctl previous"

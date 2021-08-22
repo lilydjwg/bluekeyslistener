@@ -1,0 +1,21 @@
+[package]
+name = "watch-blue"
+version = "0.1.0"
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+color-eyre = "*"
+eyre = "*"
+tracing = "*"
+tracing-subscriber = "*"
+toml = "*"
+
+[dependencies.serde]
+version = "*"
+features = ["derive"]
+
+[dependencies.input-linux]
+git = "https://github.com/lilydjwg/input-linux-rs"
+version = "*"
