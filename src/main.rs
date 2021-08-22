@@ -38,7 +38,7 @@ fn get_dev_by_name(name: &str) -> Result<PathBuf> {
         Ok(n) if n == name => { return Ok(path); },
         Ok(_) => { },
         Err(e) => {
-          warn!("failed to get name for {}: {:?}", path.to_string_lossy(), e);
+          debug!("failed to get name for {}: {:?}", path.to_string_lossy(), e);
         }
       };
     }
@@ -55,7 +55,7 @@ fn listen_input(dev: &Path, conf: config::Config) -> Result<()> {
     type_: 0, code: 0, value: 0,
   }; 4];
   loop {
-    debug!("reading events...");
+    debug!("reading events from {}...", dev.display());
     let n = ev.read(&mut events[..])?;
     if n == 0 {
       break;

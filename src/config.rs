@@ -22,7 +22,7 @@ pub struct Config {
 impl Config {
   pub fn from_str(s: &str) -> Result<Self, eyre::Report> {
     let ss: ConfigStr = toml::from_str(s)?;
-    let commands: Result<HashMap<Key, String>, _> = ss.commands.into_iter()
+    let commands: Result<Commands, _> = ss.commands.into_iter()
       .map(|(k, v)| match Key::from_str(&k) {
         Ok(k) => Ok((k, v.into_owned())),
         Err(()) => Err(format_err!("cannot parse '{}' as a Key", k)),
