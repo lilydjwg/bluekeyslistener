@@ -11,10 +11,13 @@ use tracing_subscriber::EnvFilter;
 
 use input_linux::{EvdevHandle, KeyEvent, InputEvent, Key};
 use input_linux::sys::{input_event, timeval};
+use inotify::{Inotify, WatchMask};
 
 mod config;
 
 use config::Commands;
+
+const INPUT_PATH: &str = "/dev/input";
 
 fn get_device_name<P: AsRef<Path>>(path: P) -> Result<String> {
   let mut buf = [0u8; 1024];
@@ -26,7 +29,7 @@ fn get_device_name<P: AsRef<Path>>(path: P) -> Result<String> {
 }
 
 fn get_dev_by_name(name: &str) -> Result<PathBuf> {
-  let entries = fs::read_dir("/dev/input").wrap_err("failed to read /dev/input")?;
+  let entries = fs::read_dir(INPUT_PATH).wrap_err("failed to read /dev/input")?;
   for dir in entries {
     if let Err(ref e) = dir {
       warn!("failed to read dir entry: {:?}", e);
@@ -46,7 +49,7 @@ fn get_dev_by_name(name: &str) -> Result<PathBuf> {
   bail!("{} not found", name);
 }
 
-fn listen_input(dev: &Path, conf: config::Config) -> Result<()> {
+fn listen_input(dev: &Path, conf: &config::Config) -> Result<()> {
   let file = fs::File::open(dev)?;
   let ev = EvdevHandle::new(file);
   Command::new("xinput").args(&["disable", &conf.devname]).status()?.exit_ok()?;
@@ -102,8 +105,61 @@ fn main() -> Result<()> {
   let config_string = fs::read_to_string(arg)?;
   let conf: config::Config = config::Config::from_str(&config_string)?;
 
-  let dev = get_dev_by_name(&conf.devname)?;
-  listen_input(&dev, conf)?;
+  if let Ok(dev) = get_dev_by_name(&conf.devname) {
+    if let Err(e) = listen_input(&dev, &conf) {
+      warn!("reading key events error: {:?}", e);
+    }
+  }
 
-  Ok(())
+  let mut inotify = Inotify::init()?;
+  inotify.add_watch(INPUT_PATH, WatchMask::CREATE)?;
+
+  let mut buffer = [0; 1024];
+  loop {
+    let events = inotify.read_events_blocking(&mut buffer)?;
+
+    for event in events {
+      match check_event(&event, &conf.devname) {
+        Ok(None) => { },
+        Ok(Some(p)) => {
+          if let Err(e) = listen_input(&p, &conf) {
+            warn!("reading key events error: {:?}", e);
+          }
+        },
+        Err(e) => debug!("failed to check inotify event: {:?}", e),
+      }
+    }
+  }
+}
+
+fn check_event<S: AsRef<Path>>(
+  event: &inotify::Event<S>, devname: &str,
+) -> Result<Option<PathBuf>> {
+  let name = if let Some(n) = &event.name {
+    n
+  } else {
+    return Ok(None)
+  };
+
+  let p = Path::new(INPUT_PATH).join(name);
+  if get_device_name_slow(&p)? == devname {
+    Ok(Some(p))
+  } else {
+    Ok(None)
+  }
+}
+
+fn get_device_name_slow<P: AsRef<Path>>(path: P) -> Result<String> {
+  match get_device_name(&path) {
+    Err(e) => {
+      if let Some(err) = e.downcast_ref::<std::io::Error>() {
+        if err.kind() == std::io::ErrorKind::PermissionDenied {
+          std::thread::sleep(std::time::Duration::from_millis(1000));
+          return get_device_name(&path)
+        }
+      }
+      Err(e)
+    }
+    o => o,
+  }
 }

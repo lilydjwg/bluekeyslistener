@@ -11,6 +11,7 @@ eyre = "*"
 tracing = "*"
 tracing-subscriber = "*"
 toml = "*"
+inotify = "*"
 
 [dependencies.serde]
 version = "*"
@@ -19,3 +20,6 @@ features = ["derive"]
 [dependencies.input-linux]
 git = "https://github.com/lilydjwg/input-linux-rs"
 version = "*"
+
+[profile.release]
+lto = true

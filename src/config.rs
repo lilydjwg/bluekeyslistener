@@ -25,7 +25,7 @@ impl Config {
     let commands: Result<Commands, _> = ss.commands.into_iter()
       .map(|(k, v)| match Key::from_str(&k) {
         Ok(k) => Ok((k, v.into_owned())),
-        Err(()) => Err(format_err!("cannot parse '{}' as a Key", k)),
+        Err(_) => Err(format_err!("cannot parse '{}' as a Key", k)),
       })
       .collect();
 
