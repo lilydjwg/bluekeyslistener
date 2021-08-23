@@ -32,7 +32,7 @@ fn get_dev_by_name(name: &str) -> Result<PathBuf> {
   let entries = fs::read_dir(INPUT_PATH).wrap_err("failed to read /dev/input")?;
   for dir in entries {
     if let Err(ref e) = dir {
-      warn!("failed to read dir entry: {:?}", e);
+      warn!("failed to read dir entry: {:#}", e);
       continue;
     }
     let path = dir.unwrap().path();
@@ -41,7 +41,7 @@ fn get_dev_by_name(name: &str) -> Result<PathBuf> {
         Ok(n) if n == name => { return Ok(path); },
         Ok(_) => { },
         Err(e) => {
-          debug!("failed to get name for {}: {:?}", path.to_string_lossy(), e);
+          debug!("failed to get name for {}: {:#}", path.to_string_lossy(), e);
         }
       };
     }
@@ -82,16 +82,19 @@ fn process_key(key: Key, cmds: &Commands) {
     match Command::new("sh").arg("-c").arg(cmd).status() {
       Ok(st) if st.success() => {},
       Ok(st) => warn!("cmd '{}' exited with {}", cmd, st),
-      Err(e) => error!("failed to run cmd '{}': {:?}", cmd, e),
+      Err(e) => error!("failed to run cmd '{}': {:#}", cmd, e),
     }
   }
 }
 
 fn main() -> Result<()> {
-  color_eyre::install()?;
   if std::env::var("RUST_LOG").is_err() {
     std::env::set_var("RUST_LOG", "warn")
   }
+  if std::env::var("RUST_SPANTRACE").is_err() {
+    std::env::set_var("RUST_SPANTRACE", "0");
+  }
+  color_eyre::install()?;
   tracing_subscriber::fmt::fmt()
     .with_env_filter(EnvFilter::from_default_env())
     .init();
@@ -107,7 +110,7 @@ fn main() -> Result<()> {
 
   if let Ok(dev) = get_dev_by_name(&conf.devname) {
     if let Err(e) = listen_input(&dev, &conf) {
-      warn!("reading key events error: {:?}", e);
+      warn!("reading key events error: {:#}", e);
     }
   }
 
@@ -123,10 +126,10 @@ fn main() -> Result<()> {
         Ok(None) => { },
         Ok(Some(p)) => {
           if let Err(e) = listen_input(&p, &conf) {
-            warn!("reading key events error: {:?}", e);
+            warn!("reading key events error: {:#}", e);
           }
         },
-        Err(e) => debug!("failed to check inotify event: {:?}", e),
+        Err(e) => debug!("failed to check inotify event: {:#}", e),
       }
     }
   }

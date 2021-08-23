@@ -19,7 +19,7 @@ To give yourself permissions to read from the input device, put this in `/etc/ud
 SUBSYSTEM=="input", ATTRS{name}=="WH-1000XM2 (AVRCP)", TAG+="uaccess"
 ```
 
-Where `WH-1000XM2 (AVRCP)` is the device name of your bluetooth headphone. Find out with the `evtest` program.
+Where `WH-1000XM2 (AVRCP)` is the device name of your bluetooth headphone. Find out with the `xinput` or `evtest` program.
 
 And then reload the rules:
 
