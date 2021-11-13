@@ -52,7 +52,7 @@ fn get_dev_by_name(name: &str) -> Result<PathBuf> {
 fn listen_input(dev: &Path, conf: &config::Config) -> Result<()> {
   let file = fs::File::open(dev)?;
   let ev = EvdevHandle::new(file);
-  Command::new("xinput").args(&["disable", &conf.devname]).status()?.exit_ok()?;
+  let _ = Command::new("xinput").args(&["disable", &conf.devname]).status()?.exit_ok();
   let mut events = [input_event {
     time: timeval { tv_sec: 0, tv_usec: 0 },
     type_: 0, code: 0, value: 0,
@@ -95,9 +95,14 @@ fn main() -> Result<()> {
     std::env::set_var("RUST_SPANTRACE", "0");
   }
   color_eyre::install()?;
-  tracing_subscriber::fmt::fmt()
-    .with_env_filter(EnvFilter::from_default_env())
-    .init();
+  let fmt = tracing_subscriber::fmt::fmt()
+    .with_writer(std::io::stderr)
+    .with_env_filter(EnvFilter::from_default_env());
+  if !atty::is(atty::Stream::Stderr) {
+    fmt.without_time().init();
+  } else {
+    fmt.init();
+  }
 
   let arg = if let Some(arg) = std::env::args_os().nth(1) {
     arg
