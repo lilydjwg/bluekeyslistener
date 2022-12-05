@@ -8,6 +8,7 @@ use std::process::Command;
 use eyre::{Result, WrapErr, bail};
 use tracing::{debug, info, warn, error};
 use tracing_subscriber::EnvFilter;
+use is_terminal::IsTerminal;
 
 use input_linux::{EvdevHandle, KeyEvent, InputEvent, Key};
 use input_linux::sys::{input_event, timeval};
@@ -24,7 +25,7 @@ fn get_device_name<P: AsRef<Path>>(path: P) -> Result<String> {
   let file = fs::File::open(path.as_ref()).wrap_err("can't open device file")?;
   let ev = EvdevHandle::new(file);
   let len = ev.device_name_buf(&mut buf)?;
-  Ok(std::str::from_utf8(&buf[..len as usize - 1])
+  Ok(std::str::from_utf8(&buf[..len - 1])
     .wrap_err("invalid UTF-8 device name")?.to_string())
 }
 
@@ -52,7 +53,7 @@ fn get_dev_by_name(name: &str) -> Result<PathBuf> {
 fn listen_input(dev: &Path, conf: &config::Config) -> Result<()> {
   let file = fs::File::open(dev)?;
   let ev = EvdevHandle::new(file);
-  let _ = Command::new("xinput").args(&["disable", &conf.devname]).status()?.exit_ok();
+  let _ = Command::new("xinput").args(["disable", &conf.devname]).status()?.exit_ok();
   let mut events = [input_event {
     time: timeval { tv_sec: 0, tv_usec: 0 },
     type_: 0, code: 0, value: 0,
@@ -99,7 +100,7 @@ fn main() -> Result<()> {
   let fmt = tracing_subscriber::fmt::fmt()
     .with_writer(std::io::stderr)
     .with_env_filter(filter);
-  if !atty::is(atty::Stream::Stderr) {
+  if !std::io::stderr().is_terminal() {
     fmt.without_time().init();
   } else {
     fmt.init();
