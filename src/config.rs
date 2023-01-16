@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::borrow::Cow;
 use std::str::FromStr;
+use std::sync::Arc;
 
 use serde::Deserialize;
 use input_linux::Key;
@@ -10,13 +11,13 @@ pub type Commands = HashMap<Key, String>;
 
 #[derive(Deserialize)]
 struct ConfigStr<'a> {
-  devname: String,
+  devnames: Vec<String>,
   commands: HashMap<Cow<'a, str>, Cow<'a, str>>,
 }
 
 pub struct Config {
-  pub devname: String,
-  pub commands: Commands,
+  pub devnames: Vec<String>,
+  pub commands: Arc<Commands>,
 }
 
 impl Config {
@@ -30,8 +31,8 @@ impl Config {
       .collect();
 
     Ok(Self {
-      devname: ss.devname,
-      commands: commands?,
+      devnames: ss.devnames,
+      commands: Arc::new(commands?),
     })
   }
 }

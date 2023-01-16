@@ -4,6 +4,7 @@ use std::fs;
 use std::path::{PathBuf, Path};
 use std::os::unix::ffi::OsStrExt;
 use std::process::Command;
+use std::sync::Arc;
 
 use eyre::{Result, WrapErr, bail};
 use tracing::{debug, info, warn, error};
@@ -50,33 +51,40 @@ fn get_dev_by_name(name: &str) -> Result<PathBuf> {
   bail!("{} not found", name);
 }
 
-fn listen_input(dev: &Path, conf: &config::Config) -> Result<()> {
-  let file = fs::File::open(dev)?;
+fn listen_input(
+  dev: PathBuf,
+  devname: &str,
+  commands: Arc<config::Commands>,
+) -> Result<()> {
+  let file = fs::File::open(&dev)?;
   let ev = EvdevHandle::new(file);
-  let _ = Command::new("xinput").args(["disable", &conf.devname]).status()?.exit_ok();
-  let mut events = [input_event {
-    time: timeval { tv_sec: 0, tv_usec: 0 },
-    type_: 0, code: 0, value: 0,
-  }; 4];
-  loop {
-    debug!("reading events from {}...", dev.display());
-    let n = ev.read(&mut events[..])?;
-    if n == 0 {
-      break;
-    }
-    debug!("read {} events: {:?}", n, events);
-    for event in events {
-      let ke = unsafe { KeyEvent::from_event(InputEvent::from_raw(&event)?) };
-      if ke.value.is_pressed() {
-        process_key(ke.key, &conf.commands);
+  let _ = Command::new("xinput").args(["disable", devname]).status()?.exit_ok();
+
+  std::thread::spawn(move || {
+    let mut events = [input_event {
+      time: timeval { tv_sec: 0, tv_usec: 0 },
+      type_: 0, code: 0, value: 0,
+    }; 4];
+    loop {
+      debug!("reading events from {}...", dev.display());
+      let n = ev.read(&mut events[..]).unwrap();
+      if n == 0 {
+        break;
+      }
+      debug!("read {} events: {:?}", n, events);
+      for event in events {
+        let ke = unsafe { KeyEvent::from_event(InputEvent::from_raw(&event).unwrap()) };
+        if ke.value.is_pressed() {
+          process_key(ke.key, &commands);
+        }
       }
     }
-  }
+  });
 
   Ok(())
 }
 
-fn process_key(key: Key, cmds: &Commands) {
+fn process_key(key: Key, cmds: &Arc<Commands>) {
   info!("key {:?}", key);
   if let Some(cmd) = cmds.get(&key) {
     info!("running {}", cmd);
@@ -115,9 +123,11 @@ fn main() -> Result<()> {
   let config_string = fs::read_to_string(arg)?;
   let conf: config::Config = config::Config::from_str(&config_string)?;
 
-  if let Ok(dev) = get_dev_by_name(&conf.devname) {
-    if let Err(e) = listen_input(&dev, &conf) {
-      warn!("reading key events error: {:#}", e);
+  for devname in &conf.devnames {
+    if let Ok(dev) = get_dev_by_name(devname) {
+      if let Err(e) = listen_input(dev, devname, Arc::clone(&conf.commands)) {
+        warn!("reading {} for key events error: {:#}", devname, e);
+      }
     }
   }
 
@@ -129,11 +139,11 @@ fn main() -> Result<()> {
     let events = inotify.read_events_blocking(&mut buffer)?;
 
     for event in events {
-      match check_event(&event, &conf.devname) {
+      match check_event(&event, &conf.devnames) {
         Ok(None) => { },
-        Ok(Some(p)) => {
-          if let Err(e) = listen_input(&p, &conf) {
-            warn!("reading key events error: {:#}", e);
+        Ok(Some((p, devname))) => {
+          if let Err(e) = listen_input(p, &devname, Arc::clone(&conf.commands)) {
+            warn!("reading {} for key events error: {:#}", devname, e);
           }
         },
         Err(e) => debug!("failed to check inotify event: {:#}", e),
@@ -143,8 +153,8 @@ fn main() -> Result<()> {
 }
 
 fn check_event<S: AsRef<Path>>(
-  event: &inotify::Event<S>, devname: &str,
-) -> Result<Option<PathBuf>> {
+  event: &inotify::Event<S>, devnames: &[String],
+) -> Result<Option<(PathBuf, String)>> {
   let name = if let Some(n) = &event.name {
     n
   } else {
@@ -152,8 +162,9 @@ fn check_event<S: AsRef<Path>>(
   };
 
   let p = Path::new(INPUT_PATH).join(name);
-  if get_device_name_slow(&p)? == devname {
-    Ok(Some(p))
+  let devname = get_device_name_slow(&p)?;
+  if devnames.contains(&devname) {
+    Ok(Some((p, devname)))
   } else {
     Ok(None)
   }

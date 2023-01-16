@@ -1,4 +1,7 @@
-devname = "WH-1000XM2 (AVRCP)"
+devnames = [
+  "WH-1000XM2 (AVRCP)",
+  "Bose Mini II SE SoundLink (AVRCP)",
+]
 
 [commands]
 PlayCD = "playerctl play-pause || playmusic -q &"
