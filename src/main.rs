@@ -67,10 +67,15 @@ fn listen_input(
     }; 4];
     loop {
       debug!("reading events from {}...", dev.display());
-      let n = ev.read(&mut events[..]).unwrap();
-      if n == 0 {
-        break;
-      }
+      let n = match ev.read(&mut events[..]) {
+        Err(e) if e.raw_os_error() == Some(19) => break, // No such device
+        Ok(0) => break,
+        Ok(n) => n,
+        Err(e) => {
+          error!("Error while reading events: {:?}", e);
+          break;
+        }
+      };
       debug!("read {} events: {:?}", n, events);
       for event in events {
         let ke = unsafe { KeyEvent::from_event(InputEvent::from_raw(&event).unwrap()) };
