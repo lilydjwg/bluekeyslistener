@@ -9,7 +9,7 @@ edition = "2021"
 color-eyre = "*"
 eyre = "*"
 tracing = "*"
-tracing-subscriber = "0.2"
+tracing-subscriber = { version = "*", features = ["env-filter"] }
 is-terminal = "*"
 toml = "*"
 inotify = "*"
