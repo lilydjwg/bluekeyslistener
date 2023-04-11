@@ -53,12 +53,11 @@ fn get_dev_by_name(name: &str) -> Result<PathBuf> {
 
 fn listen_input(
   dev: PathBuf,
-  devname: &str,
   commands: Arc<config::Commands>,
 ) -> Result<()> {
   let file = fs::File::open(&dev)?;
   let ev = EvdevHandle::new(file);
-  let _ = Command::new("xinput").args(["disable", devname]).status()?.exit_ok();
+  ev.grab(true)?;
 
   std::thread::spawn(move || {
     let mut events = [input_event {
@@ -130,7 +129,7 @@ fn main() -> Result<()> {
 
   for devname in &conf.devnames {
     if let Ok(dev) = get_dev_by_name(devname) {
-      if let Err(e) = listen_input(dev, devname, Arc::clone(&conf.commands)) {
+      if let Err(e) = listen_input(dev, Arc::clone(&conf.commands)) {
         warn!("reading {} for key events error: {:#}", devname, e);
       }
     }
@@ -147,7 +146,7 @@ fn main() -> Result<()> {
       match check_event(&event, &conf.devnames) {
         Ok(None) => { },
         Ok(Some((p, devname))) => {
-          if let Err(e) = listen_input(p, &devname, Arc::clone(&conf.commands)) {
+          if let Err(e) = listen_input(p, Arc::clone(&conf.commands)) {
             warn!("reading {} for key events error: {:#}", devname, e);
           }
         },
