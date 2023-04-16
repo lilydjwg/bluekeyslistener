@@ -101,11 +101,6 @@ fn process_key(key: Key, cmds: &Arc<Commands>) {
 }
 
 fn main() -> Result<()> {
-  // default RUST_SPANTRACE=0
-  color_eyre::config::HookBuilder::new()
-    .capture_span_trace_by_default(false)
-    .install()?;
-
   // default RUST_LOG=warn
   let filter = EnvFilter::try_from_default_env()
     .unwrap_or_else(|_| EnvFilter::from("warn"));
