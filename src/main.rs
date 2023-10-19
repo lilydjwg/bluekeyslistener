@@ -131,7 +131,7 @@ fn main() -> Result<()> {
   }
 
   let mut inotify = Inotify::init()?;
-  inotify.add_watch(INPUT_PATH, WatchMask::CREATE)?;
+  inotify.watches().add(INPUT_PATH, WatchMask::CREATE)?;
 
   let mut buffer = [0; 1024];
   loop {
