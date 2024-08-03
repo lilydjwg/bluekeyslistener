@@ -5,11 +5,11 @@ use std::path::{PathBuf, Path};
 use std::os::unix::ffi::OsStrExt;
 use std::process::Command;
 use std::sync::Arc;
+use std::io::IsTerminal;
 
 use eyre::{Result, WrapErr, bail};
 use tracing::{debug, info, warn, error};
 use tracing_subscriber::EnvFilter;
-use is_terminal::IsTerminal;
 
 use input_linux::{EvdevHandle, KeyEvent, InputEvent, Key};
 use input_linux::sys::{input_event, timeval};
@@ -104,13 +104,17 @@ fn main() -> Result<()> {
   // default RUST_LOG=warn
   let filter = EnvFilter::try_from_default_env()
     .unwrap_or_else(|_| EnvFilter::from("warn"));
+  let isatty = std::io::stderr().is_terminal();
   let fmt = tracing_subscriber::fmt::fmt()
     .with_writer(std::io::stderr)
-    .with_env_filter(filter);
-  if !std::io::stderr().is_terminal() {
-    fmt.without_time().init();
+    .with_env_filter(filter)
+    .with_ansi(isatty);
+  if isatty {
+    fmt
+      .with_timer(tracing_subscriber::fmt::time::LocalTime::rfc_3339())
+      .init();
   } else {
-    fmt.init();
+    fmt.without_time().init();
   }
 
   let arg = if let Some(arg) = std::env::args_os().nth(1) {
